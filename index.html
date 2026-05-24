@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>Reviagent</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        /* 1. 声明本地自定义字体 */
+        @font-face {
+            font-family: 'CascadiaMonoLocal';
+            src: url('/CascadiaMono.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+
+        /* 2. 全局重置与基础样式 */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body { 
+            font-family: 'CascadiaMonoLocal', 'Cascadia Mono ExtraLight', 'Cascadia Mono', monospace; 
+            background: #0f0f0f; 
+            color: #fff; 
+            height: 100vh; 
+            display: flex; 
+            flex-direction: column; 
+            overflow: hidden; 
+        }
+
+        /* 3. 闪屏与APP框架 */
+        #splash {
+            position: fixed; inset: 0; background: #0f0f0f;
+            display: flex; align-items: center; justify-content: center;
+            z-index: 100; transition: opacity 0.8s ease;
+        }
+        #splash img { width: 320px; opacity: 0; animation: fadeInOut 2.5s ease forwards; }
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translateY(10px); }
+            30% { opacity: 1; transform: translateY(0); }
+            70% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+
+        #app { display: flex; flex-direction: column; height: 100vh; opacity: 0; transition: opacity 0.6s ease; }
+        #app.visible { opacity: 1; }
+
+        #topbar {
+            display: flex; align-items: center; padding: 12px 20px;
+            border-bottom: 1px solid #1e1e1e; background: #0f0f0f;
+        }
+        #topbar img { height: 26px; opacity: 0.9; }
+
+        #chat-box { flex: 1; overflow-y: auto; padding: 24px 20px; display: flex; flex-direction: column; gap: 14px; position: relative; }
+        #chat-box::-webkit-scrollbar { width: 4px; }
+        #chat-box::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 2px; }
+
+        /* 4. 欢迎文字（使用新字体） */
+        #welcome {
+            position: absolute; inset: 0;
+            display: flex; align-items: center; justify-content: center;
+            pointer-events: none;
+            opacity: 0; animation: welcomeIn 0.8s ease 2.8s forwards;
+            transition: opacity 0.5s ease;
+        }
+        #welcome.hidden { opacity: 0 !important; animation: none; }
+        #welcome-text {
+            font-family: 'CascadiaMonoLocal', 'Cascadia Mono', monospace;
+            font-size: 36px; 
+            color: #fff; 
+            letter-spacing: 0.12em; 
+            text-align: center; 
+            line-height: 1.8; 
+            font-weight: 200;
+        }
+        @keyframes welcomeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes blink {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+
+        /* 5. 消息气泡与 Markdown 样式 */
+        .msg { max-width: 68%; padding: 10px 15px; border-radius: 14px; line-height: 1.6; font-size: 14px; animation: popIn 0.2s ease; }
+        @keyframes popIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        .user { background: #2563eb; align-self: flex-end; border-bottom-right-radius: 4px; }
+        .ai { background: #1a1a1a; align-self: flex-start; border: 1px solid #2a2a2a; border-bottom-left-radius: 4px; }
+        .system { background: none; align-self: center; font-size: 12px; color: #444; padding: 2px 0; }
+
+        /* 修复 AI 气泡内 Markdown 列表序号飞出的问题 */
+        .ai ol, .ai ul {
+            padding-left: 20px;       
+            margin: 8px 0;            
+        }
+        .ai li {
+            list-style-position: inside; 
+            margin-bottom: 4px;          
+        }
+        .ai p {
+            margin-bottom: 8px; 
+        }
+        .ai h1, .ai h2, .ai h3 {
+            margin: 12px 0 6px 0; 
+        }
+
+        /* 6. 输入区域 */
+        #input-area {
+            display: flex; align-items: center; padding: 14px 16px; gap: 10px;
+            border-top: 1px solid #1e1e1e; background: #0f0f0f;
+        }
+        #input {
+            flex: 1; padding: 10px 16px; border-radius: 10px; border: 1px solid #2a2a2a;
+            background: #1a1a1a; color: #fff; font-size: 14px; outline: none;
+            font-family: inherit; transition: border-color 0.2s;
+        }
+        #input:focus { border-color: #2563eb; }
+        #send {
+            padding: 10px 18px; background: #2563eb; color: #fff;
+            border: none; border-radius: 10px; cursor: pointer; font-size: 14px;
+            font-family: inherit; transition: background 0.2s;
+        }
+        #send:hover { background: #1d4ed8; }
+        #clip-btn {
+            background: none; border: none; cursor: pointer; color: #444;
+            font-size: 20px; padding: 4px 6px; transition: color 0.2s;
+        }
+        #clip-btn:hover { color: #fff; }
+        #file-input { display: none; }
+    </style>
+</head>
+<body>
+
+    <div id="splash">
+        <img src="/logo.png" alt="Reviagent"/>
+    </div>
+
+    <div id="app">
+        <div id="topbar">
+            <img src="/logo.png" alt="Reviagent"/>
+            <button onclick="newChat()" style="margin-left:auto; background:none; border:1px solid #2a2a2a; color:#aaa; padding:6px 14px; border-radius:8px; cursor:pointer; font-family:inherit; font-size:13px;">新对话</button>
+        </div>
+        <div id="chat-box">
+            <div id="welcome">
+                <div id="welcome-text"></div>
+            </div>
+        </div>
+        <div id="input-area">
+            <input type="file" id="file-input" accept=".pdf,.docx,.txt,.md" onchange="uploadFile()"/>
+            <button id="clip-btn" onclick="document.getElementById('file-input').click()">📎</button>
+            <input id="input" type="text" placeholder="输入消息..." />
+            <button id="send">发送</button>
+        </div>
+    </div>
+
+    <script>
+        // 启动动画
+        setTimeout(() => {
+            document.getElementById('splash').style.opacity = '0';
+            document.getElementById('app').classList.add('visible');
+            setTimeout(() => document.getElementById('splash').remove(), 800);
+        }, 2600);
+
+        // 随机欢迎语
+        const welcomePhrases = ['今天想忙点什么？', '问问我', '向我提问'];
+        document.getElementById('welcome-text').textContent =
+            welcomePhrases[Math.floor(Math.random() * welcomePhrases.length)];
+
+        let history = [];
+        let welcomed = false;
+
+        function hideWelcome() {
+            if (!welcomed) {
+                welcomed = true;
+                document.getElementById('welcome').classList.add('hidden');
+            }
+        }
+
+        function newChat() {
+            history = [];
+            welcomed = false;
+            document.getElementById('chat-box').innerHTML = '<div id="welcome"><div id="welcome-text">' + welcomePhrases[Math.floor(Math.random() * welcomePhrases.length)] + '</div></div>';
+            document.getElementById('welcome').style.opacity = '1';
+            document.getElementById('welcome').style.animation = 'none';
+        }
+
+        function addMsg(role, text) {
+            hideWelcome();
+            const box = document.getElementById('chat-box');
+            const div = document.createElement('div');
+            div.className = `msg ${role}`;
+            if (role === 'ai') {
+                // 使用 marked 解析 AI 返回的 markdown 字符串
+                div.innerHTML = marked.parse(text);
+            } else {
+                div.textContent = text; // 用户和系统消息保持纯文本即可
+            }
+            box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        async function send() {
+            const input = document.getElementById('input');
+            const msg = input.value.trim();
+            if (!msg) return;
+            input.value = '';
+            addMsg('user', msg);
+
+            // 加载提示
+            const box = document.getElementById('chat-box');
+            const thinking = document.createElement('div');
+            thinking.className = 'msg ai';
+            thinking.id = 'thinking';
+            thinking.textContent = '···';
+            thinking.style.animation = 'blink 1s infinite';
+            box.appendChild(thinking);
+            box.scrollTop = box.scrollHeight;
+
+            const res = await fetch('http://127.0.0.1:8000/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: msg, history })
+            });
+            const data = await res.json();
+
+            // 替换加载提示
+            document.getElementById('thinking').remove();
+            addMsg('ai', data.reply);
+            history = data.history;
+        }
+
+        async function uploadFile() {
+            const fileInput = document.getElementById('file-input');
+            const file = fileInput.files[0];
+            if (!file) return;
+            addMsg('system', `正在上传 ${file.name}...`);
+            const formData = new FormData();
+            formData.append('file', file);
+            const res = await fetch('http://127.0.0.1:8000/upload', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+            addMsg('system', data.message);
+        }
+
+        document.getElementById('send').onclick = send;
+        document.getElementById('input').addEventListener('keydown', e => {
+            if (e.key === 'Enter') send();
+        });
+    </script>
+</body>
+</html>
