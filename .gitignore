@@ -1,2 +1,8 @@
 .env
 __pycache__/
+venv/
+cert/
+*.bak
+nginx_reviagent.conf
+requirements.txt
+chroma_db/
