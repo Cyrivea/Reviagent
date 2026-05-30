@@ -3,6 +3,7 @@
 *.env
 secret_key.txt
 user_profile.json
+修改后更新服务器操作.md
 
 # 2. 拦截 Python 虚拟环境与依赖缓存
 venv/
