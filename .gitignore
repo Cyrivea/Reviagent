@@ -9,14 +9,14 @@ user_profile.json
 venv/
 .venv/
 __pycache__/
-<<<<<<< HEAD
+
 venv/
 cert/
 *.bak
 nginx_reviagent.conf
 requirements.txt
 chroma_db/
-=======
+
 *.pyc
 
 # 3. 拦截本地产生的向量数据库文件和临时日志
@@ -26,4 +26,4 @@ chroma_db/
 # 4. 拦截操作系统自带的隐藏垃圾文件
 .DS_Store
 Thumbs.db
->>>>>>> c4cdb6c (feat: 移除硬编码用户信息，添加profile接口和设置按钮)
+

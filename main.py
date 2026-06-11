@@ -18,7 +18,9 @@ import asyncio
 from ddgs import DDGS
 from fastapi.responses import FileResponse
 import json
-PROFILE_FILE = "user_profile.json"
+PROFILE_FILE = "data/user_profile.json"
+
+
 
 def load_profile() -> str:
     try:
@@ -274,6 +276,18 @@ async def chat(req: ChatRequest):  # 【异步改造】加上 async
         yield f"data: {json.dumps({'type': 'done', 'history': clean_history, 'tool_used': func_name}, ensure_ascii=False)}\n\n"
    
     return StreamingResponse(stream_generator(), media_type="text/event-stream")
+
+class ProfileRequest(BaseModel):
+    profile: str
+
+@app.post("/profile")
+def set_profile(req: ProfileRequest):
+    save_profile(req.profile)
+    return {"status": "success", "message": "个人信息已更新"}
+
+@app.get("/profile")
+def get_profile():
+    return {"profile": load_profile()}
 
 
 @app.post("/upload")
