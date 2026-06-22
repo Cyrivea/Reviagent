@@ -191,17 +191,18 @@ async def chat(req: ChatRequest):  # 【异步改造】加上 async
         context = "\n".join(docs) if docs else ""
     except:
         context = ""
-        profile = load_profile()
-        profile_section = f"\n用户信息：\n{profile}" if profile else ""
 
-        system_prompt = f"""你是Reviagent，用户的私人AI助手，说话像claude一样简洁明了，不要有情绪。{profile_section}
+    profile = load_profile()
+    profile_section = f"\n用户信息：\n{profile}" if profile else ""
 
-        工具使用规则：
-        - 涉及实时信息、新闻、天气、最新事件时，必须调用search_web工具
-        - 涉及数学计算时，调用calculate工具
-        - 用户追问或质疑某个事实时，必须重新调用search_web验证，不能依赖上下文记忆
-        - 如果搜索结果包含非中文内容，回答时自动翻译成中文
-        """
+    system_prompt = f"""你是Reviagent，用户的私人AI助手，说话像claude一样简洁明了，不要有情绪。{profile_section}
+
+工具使用规则：
+- 涉及实时信息、新闻、天气、最新事件时，必须调用search_web工具
+- 涉及数学计算时，调用calculate工具
+- 用户追问或质疑某个事实时，必须重新调用search_web验证，不能依赖上下文记忆
+- 如果搜索结果包含非中文内容，回答时自动翻译成中文
+"""
     if context:
         system_prompt += f"\n\n参考以下资料回答问题：\n{context}"
         system_prompt += "\n- 格式要求：请务必使用 Markdown 格式输出。在回答时，要善于使用小标题、加粗、粗体列表（如 1. **标题**：内容）来分点阐述，保证结构清晰、易于阅读。"
