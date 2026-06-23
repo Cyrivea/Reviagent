@@ -18,8 +18,26 @@ import asyncio
 from ddgs import DDGS
 from fastapi.responses import FileResponse
 import json
+import sqlite3
 PROFILE_FILE = "data/user_profile.json"
 
+
+DB_FILE = "data/conversations.db"
+
+def init_db():
+    conn = sqlite3.connect(DB_FILE)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            role TEXT NOT NULL,
+            content TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+init_db()
 
 
 def load_profile() -> str:
@@ -274,8 +292,15 @@ async def chat(req: ChatRequest):  # 【异步改造】加上 async
                 clean_history.append({"role": m["role"], "content": m["content"]})
 
 
+        conn = sqlite3.connect(DB_FILE)
+        conn.execute("INSERT INTO messages (role, content) VALUES (?, ?)", ("user", req.message))
+        conn.execute("INSERT INTO messages (role, content) VALUES (?, ?)", ("assistant", reply))
+        conn.commit()
+        conn.close()
         yield f"data: {json.dumps({'type': 'done', 'history': clean_history, 'tool_used': func_name}, ensure_ascii=False)}\n\n"
-   
+        
+
+
     return StreamingResponse(stream_generator(), media_type="text/event-stream")
 
 class ProfileRequest(BaseModel):
@@ -289,6 +314,25 @@ def set_profile(req: ProfileRequest):
 @app.get("/profile")
 def get_profile():
     return {"profile": load_profile()}
+
+@app.get("/favicon.ico")
+async def favicon():
+    return FileResponse("logo.png")
+
+@app.get("/history")
+async def get_history():
+    conn = sqlite3.connect(DB_FILE)
+    rows = conn.execute("SELECT role, content FROM messages ORDER BY id").fetchall()
+    conn.close()
+    return [{"role": r[0], "content": r[1]} for r in rows]
+
+@app.delete("/history")
+async def clear_history():
+    conn = sqlite3.connect(DB_FILE)
+    conn.execute("DELETE FROM messages")
+    conn.commit()
+    conn.close()
+    return {"status": "ok"}
 
 
 @app.post("/upload")
